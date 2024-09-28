@@ -2,6 +2,9 @@
 
 This is a simple Python application that uses `Tkinter` to create a GUI for reading and displaying file content based on Git changes. The program allows users to fetch the list of modified files from a Git repository, read the content of these files, and copy the content to the clipboard. It also provides functionality to save and load the contents of two textboxes for persistence between application runs.
 
+![image](https://github.com/user-attachments/assets/f6e74f7b-7dd2-4090-b545-966b40b13b06)
+
+
 ## Features
 
 - Fetches the list of changed files in a Git repository using `git status`.
