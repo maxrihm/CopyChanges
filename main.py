@@ -182,22 +182,23 @@ class MainWindow(QWidget):
 
         for file_path in file_paths:
             file_path = file_path.strip()
-            if file_path.startswith("|"):
-                # Remove the | symbol and copy only the text after it
-                prompt_lines_count += 1
-                content += f"{file_path[1:].strip()}\n"
+            full_path = os.path.join(self.project_directory, file_path)
+
+            if os.path.isfile(full_path):
+                # Treat it as a file line
+                try:
+                    with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content += f"Content of {file_path}:\n{f.read()}\n{'-' * 80}\n"
+                        file_lines_count += 1
+                except Exception as e:
+                    content += f"Failed to read {file_path}: {e}\n"
             elif file_path == "":
-                # Add a line break for empty lines
+                # Empty line, treat it as a line break
                 content += "\n"
             else:
-                full_path = os.path.join(self.project_directory, file_path.strip())
-                if os.path.isfile(full_path):
-                    try:
-                        with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            content += f"Content of {file_path}:\n{f.read()}\n{'-' * 80}\n"
-                            file_lines_count += 1
-                    except Exception as e:
-                        content += f"Failed to read {file_path}: {e}\n"
+                # Treat as a prompt line
+                prompt_lines_count += 1
+                content += f"{file_path}\n"
 
         pyperclip.copy(content)
         self.status_label.setText(f"Prompt lines: {prompt_lines_count} | File lines: {file_lines_count}")
