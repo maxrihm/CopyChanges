@@ -91,6 +91,7 @@ class MainWindow(QWidget):
 
         self.script_directory = os.path.dirname(os.path.abspath(__file__))
         self.save_file = os.path.join(self.script_directory, "textboxes_content.json")
+        self.project_directory = ""
 
         self.editor1 = TextEditor()
         self.editor2 = TextEditor()
@@ -163,7 +164,7 @@ class MainWindow(QWidget):
         self.setWindowTitle('Advanced File and Prompt Line Editor')
         self.setGeometry(300, 300, 1500, 900)
 
-        self.load_content()
+        self.load_last_workspace()
 
     def create_copy_button(self, editor, button_text, window_name):
         copy_button = QPushButton(button_text)
@@ -209,8 +210,8 @@ class MainWindow(QWidget):
             if file_path and file_path[0].isdigit():
                 window_number = int(file_path[0])
                 if 1 <= window_number <= 9:
-                    window_lines_count += 1  # Increment the window line count
-                    content += getattr(self, f'editor{window_number}').toPlainText() + "\n"
+                    window_lines_count += 1
+                    content += self.read_nested_window_content(window_number) + "\n"
                     continue
 
             full_path = os.path.join(self.project_directory, file_path)
@@ -229,9 +230,38 @@ class MainWindow(QWidget):
                 prompt_lines_count += 1
                 content += f"{file_path}\n"
 
+        if file_paths and file_paths[-1].strip() == "":
+            line_breaks_count += 1
+
         content = self.replace_placeholders(content)
         pyperclip.copy(content)
-        self.update_status(f"Copied from {window_name} | Prompt lines: {prompt_lines_count} | File lines: {file_lines_count} | Line breaks: {line_breaks_count} | Window lines: {window_lines_count}")
+        self.update_status(
+            f"Copied from {window_name} | Prompt lines: {prompt_lines_count} | File lines: {file_lines_count} | Line breaks: {line_breaks_count} | Window lines: {window_lines_count}")
+
+    def read_nested_window_content(self, window_number):
+        editor = getattr(self, f'editor{window_number}')
+        content = editor.toPlainText().splitlines()
+
+        result = ""
+        for line in content:
+            line = line.strip()
+
+            if line and line[0].isdigit():
+                nested_window_number = int(line[0])
+                if 1 <= nested_window_number <= 9:
+                    result += self.read_nested_window_content(nested_window_number) + "\n"
+            else:
+                full_path = os.path.join(self.project_directory, line)
+                if os.path.isfile(full_path):
+                    try:
+                        with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            result += f"Content of {line}:\n{f.read()}\n\n\n"
+                    except Exception as e:
+                        result += f"Failed to read {line}: {e}\n"
+                else:
+                    result += line + "\n"
+
+        return result
 
     def replace_placeholders(self, content):
         for i in range(1, 10):
@@ -246,8 +276,12 @@ class MainWindow(QWidget):
         self.status_label.setText(message)
 
     def save_content(self):
-        data = {
-            "project_directory": self.project_directory,
+        data = {}
+        if os.path.exists(self.save_file):
+            with open(self.save_file, "r") as f:
+                data = json.load(f)
+
+        data[self.project_directory] = {
             "editor1_content": self.editor1.toPlainText(),
             "editor2_content": self.editor2.toPlainText(),
             "editor3_content": self.editor3.toPlainText(),
@@ -258,6 +292,8 @@ class MainWindow(QWidget):
             "editor8_content": self.editor8.toPlainText(),
             "editor9_content": self.editor9.toPlainText(),
         }
+
+        data["last_project_directory"] = self.project_directory  # Save last used project directory
         with open(self.save_file, "w") as f:
             json.dump(data, f)
 
@@ -265,17 +301,26 @@ class MainWindow(QWidget):
         if os.path.exists(self.save_file):
             with open(self.save_file, "r") as f:
                 data = json.load(f)
-                self.project_directory = data.get("project_directory", "")
-                self.project_directory_label.setText(f"Project Directory: {self.project_directory}")
-                self.editor1.setPlainText(data.get("editor1_content", ""))
-                self.editor2.setPlainText(data.get("editor2_content", ""))
-                self.editor3.setPlainText(data.get("editor3_content", ""))
-                self.editor4.setPlainText(data.get("editor4_content", ""))
-                self.editor5.setPlainText(data.get("editor5_content", ""))
-                self.editor6.setPlainText(data.get("editor6_content", ""))
-                self.editor7.setPlainText(data.get("editor7_content", ""))
-                self.editor8.setPlainText(data.get("editor8_content", ""))
-                self.editor9.setPlainText(data.get("editor9_content", ""))
+                if self.project_directory in data:
+                    content = data[self.project_directory]
+                    self.editor1.setPlainText(content.get("editor1_content", ""))
+                    self.editor2.setPlainText(content.get("editor2_content", ""))
+                    self.editor3.setPlainText(content.get("editor3_content", ""))
+                    self.editor4.setPlainText(content.get("editor4_content", ""))
+                    self.editor5.setPlainText(content.get("editor5_content", ""))
+                    self.editor6.setPlainText(content.get("editor6_content", ""))
+                    self.editor7.setPlainText(content.get("editor7_content", ""))
+                    self.editor8.setPlainText(content.get("editor8_content", ""))
+                    self.editor9.setPlainText(content.get("editor9_content", ""))
+
+    def load_last_workspace(self):
+        if os.path.exists(self.save_file):
+            with open(self.save_file, "r") as f:
+                data = json.load(f)
+                self.project_directory = data.get("last_project_directory", "")
+                if self.project_directory:
+                    self.project_directory_label.setText(f"Project Directory: {self.project_directory}")
+                    self.load_content()
 
     def closeEvent(self, event):
         self.save_content()
