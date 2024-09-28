@@ -4,7 +4,7 @@ import subprocess
 import json
 import pyperclip
 from PyQt5.QtWidgets import QApplication, QWidget, QPlainTextEdit, QVBoxLayout, QLabel, QPushButton, QFileDialog, \
-    QHBoxLayout, QTextEdit
+    QHBoxLayout, QGridLayout, QSizePolicy, QTextEdit
 from PyQt5.QtGui import QColor, QPainter, QTextOption
 from PyQt5.QtCore import Qt, QRect, QSize
 
@@ -29,7 +29,7 @@ class TextEditor(QPlainTextEdit):
         self.updateRequest.connect(self.update_line_number_area)
         self.cursorPositionChanged.connect(self.highlight_current_line)
         self.update_line_number_area_width(0)
-        self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)  # Enable word wrap
+        self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
 
     def line_number_area_width(self):
         digits = len(str(self.blockCount()))
@@ -89,65 +89,86 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.project_directory = ""
-        self.save_file = "textboxes_content.json"
+        self.script_directory = os.path.dirname(os.path.abspath(__file__))
+        self.save_file = os.path.join(self.script_directory, "textboxes_content.json")
 
-        # Create three text editors
-        self.editor1 = TextEditor()  # First window/editor
-        self.editor2 = TextEditor()  # Second window/editor
-        self.editor3 = TextEditor()  # Third window/editor
+        self.editor1 = TextEditor()
+        self.editor2 = TextEditor()
+        self.editor3 = TextEditor()
+        self.editor4 = TextEditor()
+        self.editor5 = TextEditor()
+        self.editor6 = TextEditor()
+        self.editor7 = TextEditor()
+        self.editor8 = TextEditor()
+        self.editor9 = TextEditor()
 
         self.init_ui()
 
     def init_ui(self):
-        layout = QVBoxLayout()
+        layout = QGridLayout()
 
-        # Label for showing prompt/file line count
-        self.status_label = QLabel("Prompt lines: 0 | File lines: 0")
-        layout.addWidget(self.status_label)
+        self.status_label = QLabel("Prompt lines: 0 | File lines: 0 | Line breaks: 0 | Window lines: 0")
+        layout.addWidget(self.status_label, 0, 0, 1, 3)
 
-        # Project directory input section
         self.project_directory_label = QLabel("Project Directory:")
-        layout.addWidget(self.project_directory_label)
+        layout.addWidget(self.project_directory_label, 1, 0, 1, 3)
 
         self.browse_button = QPushButton("Browse Project Directory")
         self.browse_button.clicked.connect(self.browse_project_directory)
-        layout.addWidget(self.browse_button)
+        self.browse_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        layout.addWidget(self.browse_button, 2, 0)
 
-        # Buttons and Text Editors layout
-        buttons_layout = QHBoxLayout()
-
-        # Git Changes button (only for first window)
         self.git_button = QPushButton("Get Git Changes (Window 1)")
         self.git_button.clicked.connect(self.get_git_changes)
-        buttons_layout.addWidget(self.git_button)
+        self.git_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        layout.addWidget(self.git_button, 3, 0)
 
-        # Add all three text editors to the layout with their respective "Read and Copy Content" buttons
-        layout.addLayout(buttons_layout)
+        layout.addWidget(QLabel("Window 1 (Editor 1):"), 4, 0)
+        layout.addWidget(self.editor1, 5, 0)
+        layout.addWidget(self.create_copy_button(self.editor1, "Read and Copy Content (Window 1)", "Window 1"), 6, 0)
 
-        layout.addWidget(QLabel("Window 1 (Editor 1):"))
-        layout.addWidget(self.editor1)
-        layout.addWidget(self.create_copy_button(self.editor1, "Read and Copy Content (Window 1)"))
+        layout.addWidget(QLabel("Window 2 (Editor 2):"), 7, 0)
+        layout.addWidget(self.editor2, 8, 0)
+        layout.addWidget(self.create_copy_button(self.editor2, "Read and Copy Content (Window 2)", "Window 2"), 9, 0)
 
-        layout.addWidget(QLabel("Window 2 (Editor 2):"))
-        layout.addWidget(self.editor2)
-        layout.addWidget(self.create_copy_button(self.editor2, "Read and Copy Content (Window 2)"))
+        layout.addWidget(QLabel("Window 3 (Editor 3):"), 10, 0)
+        layout.addWidget(self.editor3, 11, 0)
+        layout.addWidget(self.create_copy_button(self.editor3, "Read and Copy Content (Window 3)", "Window 3"), 12, 0)
 
-        layout.addWidget(QLabel("Window 3 (Editor 3):"))
-        layout.addWidget(self.editor3)
-        layout.addWidget(self.create_copy_button(self.editor3, "Read and Copy Content (Window 3)"))
+        layout.addWidget(QLabel("Window 4 (Editor 4):"), 4, 1)
+        layout.addWidget(self.editor4, 5, 1)
+        layout.addWidget(self.create_copy_button(self.editor4, "Read and Copy Content (Window 4)", "Window 4"), 6, 1)
+
+        layout.addWidget(QLabel("Window 5 (Editor 5):"), 7, 1)
+        layout.addWidget(self.editor5, 8, 1)
+        layout.addWidget(self.create_copy_button(self.editor5, "Read and Copy Content (Window 5)", "Window 5"), 9, 1)
+
+        layout.addWidget(QLabel("Window 6 (Editor 6):"), 10, 1)
+        layout.addWidget(self.editor6, 11, 1)
+        layout.addWidget(self.create_copy_button(self.editor6, "Read and Copy Content (Window 6)", "Window 6"), 12, 1)
+
+        layout.addWidget(QLabel("Window 7 (Editor 7):"), 4, 2)
+        layout.addWidget(self.editor7, 5, 2)
+        layout.addWidget(self.create_copy_button(self.editor7, "Read and Copy Content (Window 7)", "Window 7"), 6, 2)
+
+        layout.addWidget(QLabel("Window 8 (Editor 8):"), 7, 2)
+        layout.addWidget(self.editor8, 8, 2)
+        layout.addWidget(self.create_copy_button(self.editor8, "Read and Copy Content (Window 8)", "Window 8"), 9, 2)
+
+        layout.addWidget(QLabel("Window 9 (Editor 9):"), 10, 2)
+        layout.addWidget(self.editor9, 11, 2)
+        layout.addWidget(self.create_copy_button(self.editor9, "Read and Copy Content (Window 9)", "Window 9"), 12, 2)
 
         self.setLayout(layout)
         self.setWindowTitle('Advanced File and Prompt Line Editor')
-        self.setGeometry(300, 300, 600, 900)  # Adjusted height for three windows
+        self.setGeometry(300, 300, 1500, 900)
 
-        # Load saved content
         self.load_content()
 
-    def create_copy_button(self, editor, button_text):
-        """ Helper function to create a button for copying content """
+    def create_copy_button(self, editor, button_text, window_name):
         copy_button = QPushButton(button_text)
-        copy_button.clicked.connect(lambda: self.read_content(editor))
+        copy_button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        copy_button.clicked.connect(lambda: self.read_content(editor, window_name))
         return copy_button
 
     def browse_project_directory(self):
@@ -159,7 +180,7 @@ class MainWindow(QWidget):
 
     def get_git_changes(self):
         if not self.project_directory:
-            self.show_error("Please set a valid project directory first.")
+            self.update_status("Please set a valid project directory first.", error=True)
             return
 
         try:
@@ -172,45 +193,57 @@ class MainWindow(QWidget):
             for path in file_paths:
                 self.editor1.appendPlainText(path)
         except Exception as e:
-            self.show_error(f"Failed to get Git changes: {e}")
+            self.update_status(f"Failed to get Git changes: {e}", error=True)
 
-    def read_content(self, editor):
+    def read_content(self, editor, window_name):
         prompt_lines_count = 0
         file_lines_count = 0
+        line_breaks_count = 0
+        window_lines_count = 0  # This will count how many lines are window references
         content = ""
         file_paths = editor.toPlainText().splitlines()
 
         for file_path in file_paths:
             file_path = file_path.strip()
+
+            if file_path and file_path[0].isdigit():
+                window_number = int(file_path[0])
+                if 1 <= window_number <= 9:
+                    window_lines_count += 1  # Increment the window line count
+                    content += getattr(self, f'editor{window_number}').toPlainText() + "\n"
+                    continue
+
             full_path = os.path.join(self.project_directory, file_path)
 
             if os.path.isfile(full_path):
-                # Treat it as a file line
                 try:
                     with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        content += f"Content of {file_path}:\n{f.read()}\n{'-' * 80}\n"
+                        content += f"Content of {file_path}:\n{f.read()}\n\n\n"
                         file_lines_count += 1
                 except Exception as e:
                     content += f"Failed to read {file_path}: {e}\n"
             elif file_path == "":
-                # Empty line, treat it as a line break
                 content += "\n"
+                line_breaks_count += 1
             else:
-                # Treat as a prompt line
                 prompt_lines_count += 1
                 content += f"{file_path}\n"
 
+        content = self.replace_placeholders(content)
         pyperclip.copy(content)
-        self.status_label.setText(f"Prompt lines: {prompt_lines_count} | File lines: {file_lines_count}")
-        self.show_message(f"Content copied to clipboard.\nPrompt lines: {prompt_lines_count}\nFile lines: {file_lines_count}")
+        self.update_status(f"Copied from {window_name} | Prompt lines: {prompt_lines_count} | File lines: {file_lines_count} | Line breaks: {line_breaks_count} | Window lines: {window_lines_count}")
 
-    def show_message(self, message):
-        msg = QLabel(message)
-        msg.show()
+    def replace_placeholders(self, content):
+        for i in range(1, 10):
+            content = content.replace(f'[{i}]', getattr(self, f'editor{i}').toPlainText())
+        return content
 
-    def show_error(self, message):
-        msg = QLabel(message)
-        msg.show()
+    def update_status(self, message, error=False):
+        if error:
+            self.status_label.setStyleSheet("color: red;")
+        else:
+            self.status_label.setStyleSheet("color: black;")
+        self.status_label.setText(message)
 
     def save_content(self):
         data = {
@@ -218,6 +251,12 @@ class MainWindow(QWidget):
             "editor1_content": self.editor1.toPlainText(),
             "editor2_content": self.editor2.toPlainText(),
             "editor3_content": self.editor3.toPlainText(),
+            "editor4_content": self.editor4.toPlainText(),
+            "editor5_content": self.editor5.toPlainText(),
+            "editor6_content": self.editor6.toPlainText(),
+            "editor7_content": self.editor7.toPlainText(),
+            "editor8_content": self.editor8.toPlainText(),
+            "editor9_content": self.editor9.toPlainText(),
         }
         with open(self.save_file, "w") as f:
             json.dump(data, f)
@@ -231,6 +270,12 @@ class MainWindow(QWidget):
                 self.editor1.setPlainText(data.get("editor1_content", ""))
                 self.editor2.setPlainText(data.get("editor2_content", ""))
                 self.editor3.setPlainText(data.get("editor3_content", ""))
+                self.editor4.setPlainText(data.get("editor4_content", ""))
+                self.editor5.setPlainText(data.get("editor5_content", ""))
+                self.editor6.setPlainText(data.get("editor6_content", ""))
+                self.editor7.setPlainText(data.get("editor7_content", ""))
+                self.editor8.setPlainText(data.get("editor8_content", ""))
+                self.editor9.setPlainText(data.get("editor9_content", ""))
 
     def closeEvent(self, event):
         self.save_content()
