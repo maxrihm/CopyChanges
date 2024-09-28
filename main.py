@@ -1,153 +1,243 @@
-import tkinter as tk
-from tkinter import messagebox
-import subprocess
+import sys
 import os
-import pyperclip
+import subprocess
 import json
+import pyperclip
+from PyQt5.QtWidgets import QApplication, QWidget, QPlainTextEdit, QVBoxLayout, QLabel, QPushButton, QFileDialog, \
+    QHBoxLayout, QTextEdit
+from PyQt5.QtGui import QColor, QPainter, QTextOption
+from PyQt5.QtCore import Qt, QRect, QSize
 
-# Set the project directory (adjust as needed)
-project_directory = r"C:\Users\morge\Desktop\Work\RSM2"
 
-# Define the save folder and file path within the Python project directory
-save_folder = os.path.join(os.path.dirname(__file__), "save_data")
-os.makedirs(save_folder, exist_ok=True)
-save_file = os.path.join(save_folder, "textboxes_content.json")
+class LineNumberArea(QWidget):
+    def __init__(self, editor):
+        super().__init__(editor)
+        self.editor = editor
 
-# Function to get changed files from Git and populate textbox1
-def getGitChanges():
-    os.chdir(project_directory)
-    try:
-        result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True)
-        changed_files = result.stdout.splitlines()
-        file_paths = [file[3:] for file in changed_files if len(file) > 3]
+    def sizeHint(self):
+        return QSize(self.editor.line_number_area_width(), 0)
 
-        # Clear textbox1 and insert paths
-        textbox1.delete("1.0", tk.END)
-        for path in file_paths:
-            absolute_path = os.path.join(project_directory, path.strip())
-            # Check if it's a file; if it's a directory, list files inside
-            if os.path.isfile(absolute_path):
-                textbox1.insert(tk.END, path + "\n")
-            elif os.path.isdir(absolute_path):
-                for root, _, files in os.walk(absolute_path):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        relative_path = os.path.relpath(file_path, project_directory)
-                        textbox1.insert(tk.END, relative_path + "\n")
-        update_line_numbers(textbox1, line_numbers1)
-    except Exception as e:
-        messagebox.showerror("Error", f"Failed to get Git changes: {e}")
+    def paintEvent(self, event):
+        self.editor.line_number_area_paint_event(event)
 
-# Function to read file content from textbox1
-def read_content1():
-    file_paths = textbox1.get("1.0", tk.END).strip().split("\n")
-    content = ""
-    copied_files_count = 0
-    for file_path in file_paths:
-        if file_path:
-            full_path = os.path.join(project_directory, file_path.strip())
-            if os.path.isfile(full_path):
-                try:
-                    with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        content += f"Content of {file_path}:\n{f.read()}\n{'-' * 80}\n"
-                        copied_files_count += 1
-                except Exception as e:
-                    content += f"Failed to read {file_path}: {e}\n"
+
+class TextEditor(QPlainTextEdit):
+    def __init__(self):
+        super().__init__()
+        self.line_number_area = LineNumberArea(self)
+        self.blockCountChanged.connect(self.update_line_number_area_width)
+        self.updateRequest.connect(self.update_line_number_area)
+        self.cursorPositionChanged.connect(self.highlight_current_line)
+        self.update_line_number_area_width(0)
+        self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)  # Enable word wrap
+
+    def line_number_area_width(self):
+        digits = len(str(self.blockCount()))
+        space = 3 + self.fontMetrics().width('9') * digits
+        return space
+
+    def update_line_number_area_width(self, _):
+        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+
+    def update_line_number_area(self, rect, dy):
+        if dy:
+            self.line_number_area.scroll(0, dy)
+        else:
+            self.line_number_area.update(0, rect.y(), self.line_number_area.width(), rect.height())
+
+        if rect.contains(self.viewport().rect()):
+            self.update_line_number_area_width(0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        cr = self.contentsRect()
+        self.line_number_area.setGeometry(QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height()))
+
+    def highlight_current_line(self):
+        extra_selections = []
+
+        if not self.isReadOnly():
+            selection = QTextEdit.ExtraSelection()
+            line_color = QColor(Qt.yellow).lighter(160)
+            selection.format.setBackground(line_color)
+            extra_selections.append(selection)
+
+        self.setExtraSelections(extra_selections)
+
+    def line_number_area_paint_event(self, event):
+        painter = QPainter(self.line_number_area)
+        painter.fillRect(event.rect(), Qt.lightGray)
+
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = int(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
+        bottom = top + int(self.blockBoundingRect(block).height())
+
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                number = str(block_number + 1)
+                painter.setPen(Qt.black)
+                painter.drawText(0, top, self.line_number_area.width(), self.fontMetrics().height(), Qt.AlignRight, number)
+
+            block = block.next()
+            top = bottom
+            bottom = top + int(self.blockBoundingRect(block).height())
+            block_number += 1
+
+
+class MainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.project_directory = ""
+        self.save_file = "textboxes_content.json"
+
+        # Create three text editors
+        self.editor1 = TextEditor()  # First window/editor
+        self.editor2 = TextEditor()  # Second window/editor
+        self.editor3 = TextEditor()  # Third window/editor
+
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+
+        # Label for showing prompt/file line count
+        self.status_label = QLabel("Prompt lines: 0 | File lines: 0")
+        layout.addWidget(self.status_label)
+
+        # Project directory input section
+        self.project_directory_label = QLabel("Project Directory:")
+        layout.addWidget(self.project_directory_label)
+
+        self.browse_button = QPushButton("Browse Project Directory")
+        self.browse_button.clicked.connect(self.browse_project_directory)
+        layout.addWidget(self.browse_button)
+
+        # Buttons and Text Editors layout
+        buttons_layout = QHBoxLayout()
+
+        # Git Changes button (only for first window)
+        self.git_button = QPushButton("Get Git Changes (Window 1)")
+        self.git_button.clicked.connect(self.get_git_changes)
+        buttons_layout.addWidget(self.git_button)
+
+        # Add all three text editors to the layout with their respective "Read and Copy Content" buttons
+        layout.addLayout(buttons_layout)
+
+        layout.addWidget(QLabel("Window 1 (Editor 1):"))
+        layout.addWidget(self.editor1)
+        layout.addWidget(self.create_copy_button(self.editor1, "Read and Copy Content (Window 1)"))
+
+        layout.addWidget(QLabel("Window 2 (Editor 2):"))
+        layout.addWidget(self.editor2)
+        layout.addWidget(self.create_copy_button(self.editor2, "Read and Copy Content (Window 2)"))
+
+        layout.addWidget(QLabel("Window 3 (Editor 3):"))
+        layout.addWidget(self.editor3)
+        layout.addWidget(self.create_copy_button(self.editor3, "Read and Copy Content (Window 3)"))
+
+        self.setLayout(layout)
+        self.setWindowTitle('Advanced File and Prompt Line Editor')
+        self.setGeometry(300, 300, 600, 900)  # Adjusted height for three windows
+
+        # Load saved content
+        self.load_content()
+
+    def create_copy_button(self, editor, button_text):
+        """ Helper function to create a button for copying content """
+        copy_button = QPushButton(button_text)
+        copy_button.clicked.connect(lambda: self.read_content(editor))
+        return copy_button
+
+    def browse_project_directory(self):
+        directory = QFileDialog.getExistingDirectory(self, "Select Project Directory")
+        if directory:
+            self.project_directory = directory
+            self.project_directory_label.setText(f"Project Directory: {self.project_directory}")
+            self.save_content()
+
+    def get_git_changes(self):
+        if not self.project_directory:
+            self.show_error("Please set a valid project directory first.")
+            return
+
+        try:
+            os.chdir(self.project_directory)
+            result = subprocess.run(['git', 'status', '--porcelain'], capture_output=True, text=True)
+            changed_files = result.stdout.splitlines()
+            file_paths = [file[3:] for file in changed_files if len(file) > 3]
+
+            self.editor1.clear()
+            for path in file_paths:
+                self.editor1.appendPlainText(path)
+        except Exception as e:
+            self.show_error(f"Failed to get Git changes: {e}")
+
+    def read_content(self, editor):
+        prompt_lines_count = 0
+        file_lines_count = 0
+        content = ""
+        file_paths = editor.toPlainText().splitlines()
+
+        for file_path in file_paths:
+            file_path = file_path.strip()
+            if file_path.startswith("|"):
+                # Remove the | symbol and copy only the text after it
+                prompt_lines_count += 1
+                content += f"{file_path[1:].strip()}\n"
+            elif file_path == "":
+                # Add a line break for empty lines
+                content += "\n"
             else:
-                content += f"Skipped: {file_path} (not a file or deleted).\n"
-    pyperclip.copy(content)
-    messagebox.showinfo("Info", f"Content copied to clipboard. Total files copied: {copied_files_count}")
+                full_path = os.path.join(self.project_directory, file_path.strip())
+                if os.path.isfile(full_path):
+                    try:
+                        with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content += f"Content of {file_path}:\n{f.read()}\n{'-' * 80}\n"
+                            file_lines_count += 1
+                    except Exception as e:
+                        content += f"Failed to read {file_path}: {e}\n"
 
-# Function to read file content from textbox2
-def read_content2():
-    file_paths = textbox2.get("1.0", tk.END).strip().split("\n")
-    content = ""
-    copied_files_count = 0
-    for file_path in file_paths:
-        if file_path:
-            full_path = os.path.join(project_directory, file_path.strip())
-            if os.path.isfile(full_path):
-                try:
-                    with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        content += f"Content of {file_path}:\n{f.read()}\n{'-' * 80}\n"
-                        copied_files_count += 1
-                except Exception as e:
-                    content += f"Failed to read {file_path}: {e}\n"
-            else:
-                content += f"Skipped: {file_path} (not a file or deleted).\n"
-    pyperclip.copy(content)
-    messagebox.showinfo("Info", f"Content copied to clipboard. Total files copied: {copied_files_count}")
+        pyperclip.copy(content)
+        self.status_label.setText(f"Prompt lines: {prompt_lines_count} | File lines: {file_lines_count}")
+        self.show_message(f"Content copied to clipboard.\nPrompt lines: {prompt_lines_count}\nFile lines: {file_lines_count}")
 
-# Function to save the content of textboxes to a file
-def save_content():
-    data = {
-        "textbox1": textbox1.get("1.0", tk.END).strip(),
-        "textbox2": textbox2.get("1.0", tk.END).strip(),
-    }
-    with open(save_file, "w") as f:
-        json.dump(data, f)
+    def show_message(self, message):
+        msg = QLabel(message)
+        msg.show()
 
-# Function to load the content of textboxes from a file
-def load_content():
-    if os.path.exists(save_file):
-        with open(save_file, "r") as f:
-            data = json.load(f)
-            textbox1.insert(tk.END, data.get("textbox1", "").strip())
-            textbox2.insert(tk.END, data.get("textbox2", "").strip())
-            update_line_numbers(textbox1, line_numbers1)
-            update_line_numbers(textbox2, line_numbers2)
+    def show_error(self, message):
+        msg = QLabel(message)
+        msg.show()
 
-# Function to update the line numbers for the textboxes
-def update_line_numbers(textbox, line_numbers):
-    line_count = int(textbox.index('end-1c').split('.')[0])
-    line_numbers.config(state='normal')
-    line_numbers.delete('1.0', tk.END)
-    line_numbers.insert(tk.END, "\n".join(str(i) for i in range(1, line_count + 1)))
-    line_numbers.config(state='disabled')
+    def save_content(self):
+        data = {
+            "project_directory": self.project_directory,
+            "editor1_content": self.editor1.toPlainText(),
+            "editor2_content": self.editor2.toPlainText(),
+            "editor3_content": self.editor3.toPlainText(),
+        }
+        with open(self.save_file, "w") as f:
+            json.dump(data, f)
 
-# Function to create a frame with a textbox and line numbers
-def create_textbox_frame(parent):
-    frame = tk.Frame(parent)
+    def load_content(self):
+        if os.path.exists(self.save_file):
+            with open(self.save_file, "r") as f:
+                data = json.load(f)
+                self.project_directory = data.get("project_directory", "")
+                self.project_directory_label.setText(f"Project Directory: {self.project_directory}")
+                self.editor1.setPlainText(data.get("editor1_content", ""))
+                self.editor2.setPlainText(data.get("editor2_content", ""))
+                self.editor3.setPlainText(data.get("editor3_content", ""))
 
-    # Create line numbers textbox
-    line_numbers = tk.Text(frame, width=4, padx=4, takefocus=0, border=0, background='lightgrey', state='disabled')
-    line_numbers.pack(side=tk.LEFT, fill=tk.Y)
+    def closeEvent(self, event):
+        self.save_content()
+        event.accept()
 
-    # Create main textbox
-    textbox = tk.Text(frame, height=20, width=80)
-    textbox.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
-    # Bind event to update line numbers when content changes
-    textbox.bind("<KeyRelease>", lambda event: update_line_numbers(textbox, line_numbers))
-
-    return frame, textbox, line_numbers
-
-# Create the main window
-root = tk.Tk()
-root.title("File Content Reader")
-
-# Create the first textbox and button
-frame1, textbox1, line_numbers1 = create_textbox_frame(root)
-frame1.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-
-button1 = tk.Button(root, text="Get Git Changes", command=getGitChanges)
-button1.pack(pady=5)
-
-read_button1 = tk.Button(root, text="Read Content 1", command=read_content1)
-read_button1.pack(pady=5)
-
-# Create the second textbox and button
-frame2, textbox2, line_numbers2 = create_textbox_frame(root)
-frame2.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
-
-read_button2 = tk.Button(root, text="Read Content 2", command=read_content2)
-read_button2.pack(pady=5)
-
-# Load content from the save file when the application starts
-load_content()
-
-# Save content to the save file when the application closes
-root.protocol("WM_DELETE_WINDOW", lambda: (save_content(), root.destroy()))
-
-# Start the main loop
-root.mainloop()
+if __name__ == '__main__':
+    app = QApplication(sys.argv)
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec_())
