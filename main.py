@@ -3,8 +3,8 @@ import os
 import subprocess
 import json
 import pyperclip
-from PyQt5.QtWidgets import QApplication, QWidget, QPlainTextEdit, QVBoxLayout, QLabel, QPushButton, QFileDialog, \
-    QHBoxLayout, QGridLayout, QSizePolicy, QTextEdit
+from PyQt5.QtWidgets import QApplication, QWidget, QPlainTextEdit, QLabel, QPushButton, QFileDialog, QGridLayout, \
+    QSizePolicy, QTextEdit
 from PyQt5.QtGui import QColor, QPainter, QTextOption
 from PyQt5.QtCore import Qt, QRect, QSize
 
@@ -55,13 +55,11 @@ class TextEditor(QPlainTextEdit):
 
     def highlight_current_line(self):
         extra_selections = []
-
         if not self.isReadOnly():
             selection = QTextEdit.ExtraSelection()
             line_color = QColor(Qt.yellow).lighter(160)
             selection.format.setBackground(line_color)
             extra_selections.append(selection)
-
         self.setExtraSelections(extra_selections)
 
     def line_number_area_paint_event(self, event):
@@ -93,15 +91,7 @@ class MainWindow(QWidget):
         self.save_file = os.path.join(self.script_directory, "textboxes_content.json")
         self.project_directory = ""
 
-        self.editor1 = TextEditor()
-        self.editor2 = TextEditor()
-        self.editor3 = TextEditor()
-        self.editor4 = TextEditor()
-        self.editor5 = TextEditor()
-        self.editor6 = TextEditor()
-        self.editor7 = TextEditor()
-        self.editor8 = TextEditor()
-        self.editor9 = TextEditor()
+        self.editors = [TextEditor() for _ in range(9)]
 
         self.init_ui()
 
@@ -124,46 +114,14 @@ class MainWindow(QWidget):
         self.git_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         layout.addWidget(self.git_button, 3, 0)
 
-        layout.addWidget(QLabel("Window 1 (Editor 1):"), 4, 0)
-        layout.addWidget(self.editor1, 5, 0)
-        layout.addWidget(self.create_copy_button(self.editor1, "Read and Copy Content (Window 1)", "Window 1"), 6, 0)
-
-        layout.addWidget(QLabel("Window 2 (Editor 2):"), 7, 0)
-        layout.addWidget(self.editor2, 8, 0)
-        layout.addWidget(self.create_copy_button(self.editor2, "Read and Copy Content (Window 2)", "Window 2"), 9, 0)
-
-        layout.addWidget(QLabel("Window 3 (Editor 3):"), 10, 0)
-        layout.addWidget(self.editor3, 11, 0)
-        layout.addWidget(self.create_copy_button(self.editor3, "Read and Copy Content (Window 3)", "Window 3"), 12, 0)
-
-        layout.addWidget(QLabel("Window 4 (Editor 4):"), 4, 1)
-        layout.addWidget(self.editor4, 5, 1)
-        layout.addWidget(self.create_copy_button(self.editor4, "Read and Copy Content (Window 4)", "Window 4"), 6, 1)
-
-        layout.addWidget(QLabel("Window 5 (Editor 5):"), 7, 1)
-        layout.addWidget(self.editor5, 8, 1)
-        layout.addWidget(self.create_copy_button(self.editor5, "Read and Copy Content (Window 5)", "Window 5"), 9, 1)
-
-        layout.addWidget(QLabel("Window 6 (Editor 6):"), 10, 1)
-        layout.addWidget(self.editor6, 11, 1)
-        layout.addWidget(self.create_copy_button(self.editor6, "Read and Copy Content (Window 6)", "Window 6"), 12, 1)
-
-        layout.addWidget(QLabel("Window 7 (Editor 7):"), 4, 2)
-        layout.addWidget(self.editor7, 5, 2)
-        layout.addWidget(self.create_copy_button(self.editor7, "Read and Copy Content (Window 7)", "Window 7"), 6, 2)
-
-        layout.addWidget(QLabel("Window 8 (Editor 8):"), 7, 2)
-        layout.addWidget(self.editor8, 8, 2)
-        layout.addWidget(self.create_copy_button(self.editor8, "Read and Copy Content (Window 8)", "Window 8"), 9, 2)
-
-        layout.addWidget(QLabel("Window 9 (Editor 9):"), 10, 2)
-        layout.addWidget(self.editor9, 11, 2)
-        layout.addWidget(self.create_copy_button(self.editor9, "Read and Copy Content (Window 9)", "Window 9"), 12, 2)
+        for i in range(9):
+            layout.addWidget(QLabel(f"Window {i+1} (Editor {i+1}):"), 4 + (i//3)*3, i % 3)
+            layout.addWidget(self.editors[i], 5 + (i//3)*3, i % 3)
+            layout.addWidget(self.create_copy_button(self.editors[i], f"Read and Copy Content (Window {i+1})", f"Window {i+1}"), 6 + (i//3)*3, i % 3)
 
         self.setLayout(layout)
         self.setWindowTitle('Advanced File and Prompt Line Editor')
         self.setGeometry(300, 300, 1500, 900)
-
         self.load_last_workspace()
 
     def create_copy_button(self, editor, button_text, window_name):
@@ -190,83 +148,76 @@ class MainWindow(QWidget):
             changed_files = result.stdout.splitlines()
             file_paths = [file[3:] for file in changed_files if len(file) > 3]
 
-            self.editor1.clear()
+            self.editors[0].clear()
             for path in file_paths:
-                self.editor1.appendPlainText(path)
+                self.editors[0].appendPlainText(path)
         except Exception as e:
             self.update_status(f"Failed to get Git changes: {e}", error=True)
 
     def read_content(self, editor, window_name):
-        prompt_lines_count = 0
-        file_lines_count = 0
-        line_breaks_count = 0
-        window_lines_count = 0  # This will count how many lines are window references
         content = ""
-        file_paths = editor.toPlainText().splitlines()
-
-        for file_path in file_paths:
-            file_path = file_path.strip()
-
-            if file_path and file_path[0].isdigit():
-                window_number = int(file_path[0])
-                if 1 <= window_number <= 9:
-                    window_lines_count += 1
-                    content += self.read_nested_window_content(window_number) + "\n"
-                    continue
-
-            full_path = os.path.join(self.project_directory, file_path)
-
-            if os.path.isfile(full_path):
-                try:
-                    with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                        content += f"Content of {file_path}:\n{f.read()}\n\n\n"
-                        file_lines_count += 1
-                except Exception as e:
-                    content += f"Failed to read {file_path}: {e}\n"
-            elif file_path == "":
-                content += "\n"
-                line_breaks_count += 1
-            else:
-                prompt_lines_count += 1
-                content += f"{file_path}\n"
-
-        if file_paths and file_paths[-1].strip() == "":
-            line_breaks_count += 1
-
-        content = self.replace_placeholders(content)
-        pyperclip.copy(content)
-        self.update_status(
-            f"Copied from {window_name} | Prompt lines: {prompt_lines_count} | File lines: {file_lines_count} | Line breaks: {line_breaks_count} | Window lines: {window_lines_count}")
-
-    def read_nested_window_content(self, window_number):
-        editor = getattr(self, f'editor{window_number}')
-        content = editor.toPlainText().splitlines()
-
-        result = ""
-        for line in content:
+        lines = editor.toPlainText().splitlines()
+        for line in lines:
             line = line.strip()
+            content += self.process_line(line) + "\n"
 
-            if line and line[0].isdigit():
-                nested_window_number = int(line[0])
-                if 1 <= nested_window_number <= 9:
-                    result += self.read_nested_window_content(nested_window_number) + "\n"
-            else:
-                full_path = os.path.join(self.project_directory, line)
-                if os.path.isfile(full_path):
-                    try:
-                        with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            result += f"Content of {line}:\n{f.read()}\n\n\n"
-                    except Exception as e:
-                        result += f"Failed to read {line}: {e}\n"
-                else:
-                    result += line + "\n"
+        pyperclip.copy(content)
+        self.update_status(f"Copied from {window_name}")
 
+    def process_line(self, line):
+        if not line:
+            return ""
+        if line[0].isdigit():  # Nested window reference
+            return self.read_nested_window_content(int(line[0]))
+        elif line.startswith('V'):  # Handle V syntax
+            return self.handle_v_syntax(line[1:].strip())
+        else:
+            return self.read_file_content(line)
+
+    def handle_v_syntax(self, json_path):
+        json_data = self.load_json_data()
+        if isinstance(json_data, str):  # Error in loading JSON
+            return json_data
+
+        normalized_json_path = json_path.lower().replace("/", "\\")
+        result = ""
+        for file_path, file_data in json_data.items():
+            if normalized_json_path in file_path.lower():
+                file_name = os.path.basename(file_path)
+                result += f"Partial content of file {file_name}:\n"
+                for item in file_data:
+                    result += item['content'] + "\n...\n"
+        if not result:
+            return f"JSON path {json_path} not found."
         return result
 
-    def replace_placeholders(self, content):
-        for i in range(1, 10):
-            content = content.replace(f'[{i}]', getattr(self, f'editor{i}').toPlainText())
-        return content
+    def read_nested_window_content(self, window_number):
+        if 1 <= window_number <= 9:
+            editor = self.editors[window_number - 1]
+            return "\n".join(self.process_line(line.strip()) for line in editor.toPlainText().splitlines())
+        return ""
+
+    def read_file_content(self, file_path):
+        full_path = os.path.join(self.project_directory, file_path)
+
+        # If the file exists, read its content.
+        if os.path.isfile(full_path):
+            try:
+                with open(full_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    return f"Content of {os.path.basename(full_path)}:\n{f.read()}\n"
+            except Exception as e:
+                return f"Failed to read {file_path}: {e}\n"
+
+        # If the file doesn't exist, return the original input line as regular text.
+        return file_path
+
+    def load_json_data(self):
+        json_path = r"C:\Users\morge\copy-select\selections.json"
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception as e:
+            return f"Error loading JSON: {e}"
 
     def update_status(self, message, error=False):
         if error:
@@ -276,24 +227,8 @@ class MainWindow(QWidget):
         self.status_label.setText(message)
 
     def save_content(self):
-        data = {}
-        if os.path.exists(self.save_file):
-            with open(self.save_file, "r") as f:
-                data = json.load(f)
-
-        data[self.project_directory] = {
-            "editor1_content": self.editor1.toPlainText(),
-            "editor2_content": self.editor2.toPlainText(),
-            "editor3_content": self.editor3.toPlainText(),
-            "editor4_content": self.editor4.toPlainText(),
-            "editor5_content": self.editor5.toPlainText(),
-            "editor6_content": self.editor6.toPlainText(),
-            "editor7_content": self.editor7.toPlainText(),
-            "editor8_content": self.editor8.toPlainText(),
-            "editor9_content": self.editor9.toPlainText(),
-        }
-
-        data["last_project_directory"] = self.project_directory  # Save last used project directory
+        data = {self.project_directory: {f"editor{i+1}_content": editor.toPlainText() for i, editor in enumerate(self.editors)}}
+        data["last_project_directory"] = self.project_directory
         with open(self.save_file, "w") as f:
             json.dump(data, f)
 
@@ -303,15 +238,8 @@ class MainWindow(QWidget):
                 data = json.load(f)
                 if self.project_directory in data:
                     content = data[self.project_directory]
-                    self.editor1.setPlainText(content.get("editor1_content", ""))
-                    self.editor2.setPlainText(content.get("editor2_content", ""))
-                    self.editor3.setPlainText(content.get("editor3_content", ""))
-                    self.editor4.setPlainText(content.get("editor4_content", ""))
-                    self.editor5.setPlainText(content.get("editor5_content", ""))
-                    self.editor6.setPlainText(content.get("editor6_content", ""))
-                    self.editor7.setPlainText(content.get("editor7_content", ""))
-                    self.editor8.setPlainText(content.get("editor8_content", ""))
-                    self.editor9.setPlainText(content.get("editor9_content", ""))
+                    for i, editor in enumerate(self.editors):
+                        editor.setPlainText(content.get(f"editor{i+1}_content", ""))
 
     def load_last_workspace(self):
         if os.path.exists(self.save_file):
