@@ -13,14 +13,17 @@ class MainController:
         self.view = view
         self.project_directory = ""
         self.editors = view.editors
-        self.file_browser = FileBrowser(self)  # Correctly passing self to the FileBrowser
+        self.file_browser = FileBrowser(self)
 
-        # Use services for handling specific tasks
         self.file_service = FileService()
         self.git_service = GitService()
         self.json_service = JsonService()
 
         self.save_file = config.SAVE_FILE
+
+        # Do not load any content until a project directory is selected
+        self.view.update_status("Please select a project directory to load content.", error=False)
+        self.view.update_project_directory_label("Project Directory: Not Set")
 
     def browse_project_directory(self):
         try:
@@ -29,7 +32,8 @@ class MainController:
                 self.project_directory = directory
                 self.view.update_project_directory_label(self.project_directory)
                 self.file_browser.load_directory(directory)
-                self.save_content()
+                self.load_content()  # Load content after the directory is selected
+                self.save_content()  # Save the newly selected project directory
             else:
                 self.view.update_status("No directory selected.", error=True)
         except Exception as e:
@@ -114,6 +118,9 @@ class MainController:
             return file_path
 
     def save_content(self):
+        if not self.project_directory:
+            return  # Don't save if no project directory is selected
+
         data = {
             self.project_directory: {
                 f"editor{i+1}_content": editor.toPlainText()
