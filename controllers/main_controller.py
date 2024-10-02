@@ -1,14 +1,14 @@
 # controllers/main_controller.py
 
+from PyQt5.QtWidgets import QFileDialog
+from utils.git_utils import get_git_changes
+from views.file_browser import FileBrowser
 import os
 import json
+import config
 import pyperclip
-from PyQt5.QtWidgets import QFileDialog
-
 from utils.file_utils import read_file_content
 from utils.json_utils import load_json_file
-from utils.git_utils import get_git_changes
-import config
 
 
 class MainController:
@@ -16,6 +16,7 @@ class MainController:
         self.view = view
         self.project_directory = ""
         self.editors = view.editors
+        self.file_browser = FileBrowser(self)  # New file browser instance
         self.save_file = config.SAVE_FILE
 
     def browse_project_directory(self):
@@ -23,6 +24,7 @@ class MainController:
         if directory:
             self.project_directory = directory
             self.view.update_project_directory_label(self.project_directory)
+            self.file_browser.load_directory(directory)  # Load project directory into file browser
             self.save_content()
 
     def get_git_changes(self):
@@ -38,6 +40,17 @@ class MainController:
         self.editors[0].clear()
         for path in file_paths:
             self.editors[0].appendPlainText(path)
+
+    def get_selected_files(self):
+        checked_files = self.file_browser.get_checked_items()
+        if checked_files:
+            editor = self.editors[0]  # Assume Window 1 for simplicity
+            editor.clear()
+            for file_path in checked_files:
+                relative_path = os.path.relpath(file_path, self.project_directory)
+                editor.appendPlainText(relative_path)
+        else:
+            self.view.update_status("No files selected", error=True)
 
     def read_content(self, editor, window_name):
         content = ""

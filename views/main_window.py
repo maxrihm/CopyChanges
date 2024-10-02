@@ -1,9 +1,8 @@
 # views/main_window.py
 
-from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QGridLayout, QSizePolicy
-from PyQt5.QtCore import Qt
-
+from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QGridLayout, QSizePolicy, QSplitter
 from views.text_editor import TextEditor
+from views.file_browser import FileBrowser
 from controllers.main_controller import MainController
 
 
@@ -13,6 +12,7 @@ class MainWindow(QWidget):
 
         self.editors = [TextEditor() for _ in range(9)]
         self.controller = MainController(self)
+        self.file_browser = self.controller.file_browser
 
         self.init_ui()
 
@@ -35,13 +35,23 @@ class MainWindow(QWidget):
         self.git_button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         layout.addWidget(self.git_button, 3, 0)
 
+        # Create a splitter to hold the file browser and the text editors
+        splitter = QSplitter()
+        splitter.addWidget(self.file_browser)
+
+        editor_widget = QWidget()
+        editor_layout = QGridLayout()
+
         for i in range(9):
-            layout.addWidget(QLabel(f"Window {i+1} (Editor {i+1}):"), 4 + (i//3)*3, i % 3)
-            layout.addWidget(self.editors[i], 5 + (i//3)*3, i % 3)
-            copy_button = self.create_copy_button(
-                self.editors[i], f"Read and Copy Content (Window {i+1})", f"Window {i+1}"
-            )
-            layout.addWidget(copy_button, 6 + (i//3)*3, i % 3)
+            editor_layout.addWidget(QLabel(f"Window {i+1} (Editor {i+1}):"), 4 + (i//3)*3, i % 3)
+            editor_layout.addWidget(self.editors[i], 5 + (i//3)*3, i % 3)
+            copy_button = self.create_copy_button(self.editors[i], f"Read and Copy Content (Window {i+1})", f"Window {i+1}")
+            editor_layout.addWidget(copy_button, 6 + (i//3)*3, i % 3)
+
+        editor_widget.setLayout(editor_layout)
+        splitter.addWidget(editor_widget)
+
+        layout.addWidget(splitter, 4, 0, 1, 3)
 
         self.setLayout(layout)
         self.setWindowTitle('Advanced File and Prompt Line Editor')
