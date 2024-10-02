@@ -27,6 +27,7 @@ class TextEditor(QPlainTextEdit):
         self.update_line_number_area_width(0)
         self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
 
+
     def line_number_area_width(self):
         digits = len(str(self.blockCount()))
         space = 3 + self.fontMetrics().width('9') * digits

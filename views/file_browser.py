@@ -18,14 +18,18 @@ class FileBrowser(QWidget):
         layout.addWidget(self.tree)
 
         self.get_files_button = QPushButton("Get Files")
-        self.get_files_button.clicked.connect(self.controller.get_selected_files)
+        self.get_files_button.clicked.connect(self.controller.get_selected_files)  # Correct reference to controller
         layout.addWidget(self.get_files_button)
 
         self.setLayout(layout)
 
     def load_directory(self, directory):
-        self.tree.clear()
-        self.add_items(self.tree.invisibleRootItem(), directory)
+        try:
+            print(f"Loading directory: {directory}")  # Debugging: Log the directory being loaded
+            self.tree.clear()
+            self.add_items(self.tree.invisibleRootItem(), directory)
+        except Exception as e:
+            print(f"Error loading directory: {e}")  # Debugging: Catch any errors in loading
 
     def add_items(self, parent, path):
         for item_name in sorted(os.listdir(path)):

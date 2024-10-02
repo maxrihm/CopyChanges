@@ -9,6 +9,7 @@ import config
 import pyperclip
 from utils.file_utils import read_file_content
 from utils.json_utils import load_json_file
+from views.text_editor import TextEditor
 
 
 class MainController:
@@ -16,16 +17,23 @@ class MainController:
         self.view = view
         self.project_directory = ""
         self.editors = view.editors
-        self.file_browser = FileBrowser(self)  # New file browser instance
+        self.file_browser = FileBrowser(self)  # Correctly passing self to the FileBrowser
         self.save_file = config.SAVE_FILE
 
     def browse_project_directory(self):
-        directory = QFileDialog.getExistingDirectory(self.view, "Select Project Directory")
-        if directory:
-            self.project_directory = directory
-            self.view.update_project_directory_label(self.project_directory)
-            self.file_browser.load_directory(directory)  # Load project directory into file browser
-            self.save_content()
+        try:
+            directory = QFileDialog.getExistingDirectory(self.view, "Select Project Directory")
+            if directory:
+                self.project_directory = directory
+                print(f"Selected directory: {self.project_directory}")  # Debugging: Confirm the directory
+                self.view.update_project_directory_label(self.project_directory)
+                self.file_browser.load_directory(directory)  # Load project directory into file browser
+                self.save_content()
+            else:
+                print("No directory selected.")  # Debugging: Handle case when no directory is selected
+        except Exception as e:
+            print(f"Error when selecting folder: {e}")  # Debugging: Catch any crashes here
+            self.view.update_status(f"Error when selecting folder: {e}", error=True)
 
     def get_git_changes(self):
         if not self.project_directory:
@@ -42,15 +50,28 @@ class MainController:
             self.editors[0].appendPlainText(path)
 
     def get_selected_files(self):
+        """Get selected files from the file browser and show them in Window 1."""
         checked_files = self.file_browser.get_checked_items()
+        print(f"Checked files: {checked_files}")
+
+        editor = self.editors[0]  # Reference Window 1 (Editor 1)
+        print(f"Editor 1 object: {editor}")
+
+        editor.clear()  # Clear Window 1
+        editor.appendPlainText("Test Text")  # Ensure something simple is appended to test visibility
+        editor.repaint()  # Force a UI refresh here
+
         if checked_files:
-            editor = self.editors[0]  # Assume Window 1 for simplicity
-            editor.clear()
             for file_path in checked_files:
                 relative_path = os.path.relpath(file_path, self.project_directory)
-                editor.appendPlainText(relative_path)
+                print(f"Adding file to editor: {relative_path}")
+                editor.appendPlainText(relative_path)  # Add relative path of the selected file to Window 1
+
+            # After appending all file paths, ensure the editor is repainted
+            editor.repaint()
         else:
             self.view.update_status("No files selected", error=True)
+            print("No files selected.")
 
     def read_content(self, editor, window_name):
         content = ""
