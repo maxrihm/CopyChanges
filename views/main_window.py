@@ -1,6 +1,4 @@
-# views/main_window.py
-
-from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QGridLayout, QSizePolicy, QSplitter, QTabWidget, QVBoxLayout
+from PyQt5.QtWidgets import QWidget, QLabel, QPushButton, QGridLayout, QVBoxLayout, QTabWidget, QSizePolicy, QSplitter
 from views.text_editor import TextEditor
 from views.file_browser import FileBrowser
 from controllers.main_controller import MainController
@@ -13,11 +11,17 @@ class MainWindow(QWidget):
         # Initialize tabs and layouts
         self.tabs = QTabWidget()  # Create a tab widget
 
+        # Initialize the file browser first, then pass to the controller later
+        self.file_browser = FileBrowser()
+
         # Initialize tab content but don't initialize the controller yet
         self.init_text_editor_tab()
 
-        # Now initialize the controller after the editors are ready
+        # Now initialize the controller after the editors and file_browser are ready
         self.controller = MainController(self)
+
+        # Set the controller for the file browser
+        self.file_browser.set_controller(self.controller.file_browser_controller)
 
         self.init_file_browser_tab()  # Initialize file browser after controller is available
 
@@ -61,8 +65,6 @@ class MainWindow(QWidget):
         file_browser_tab = QWidget()
         layout = QGridLayout()
 
-        self.file_browser = self.controller.file_browser  # FileBrowser is initialized via the controller
-
         # File Browser and Git Buttons
         self.browse_button = QPushButton("Browse Project Directory")
         self.browse_button.clicked.connect(self.controller.browse_project_directory)
@@ -105,9 +107,6 @@ class MainWindow(QWidget):
 
     def on_tab_change(self, index):
         """Handle actions when the user changes tabs."""
-        # Check if the "Text Editors" tab is selected
         if self.tabs.tabText(index) == "Text Editors":
             print("Text Editors tab selected, refreshing Window 1.")
-
-            # Force Window 1 (self.editors[0]) to repaint when tab is selected
             self.editors[0].repaint()

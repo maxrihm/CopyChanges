@@ -2,7 +2,7 @@ from PyQt5.QtWidgets import QFileDialog
 from services.file_service import FileService
 from services.git_service import GitService
 from services.json_service import JsonService
-from views.file_browser import FileBrowser
+from controllers.file_browser_controller import FileBrowserController
 import os
 import json
 import config
@@ -13,15 +13,16 @@ class MainController:
         self.view = view
         self.project_directory = ""
         self.editors = view.editors
-        self.file_browser = FileBrowser(self)
 
+        # Service instances
         self.file_service = FileService()
         self.git_service = GitService()
         self.json_service = JsonService()
 
+        self.file_browser_controller = None  # Initialize after directory is selected
         self.save_file = config.SAVE_FILE
 
-        # Do not load any content until a project directory is selected
+        # Status update
         self.view.update_status("Please select a project directory to load content.", error=False)
         self.view.update_project_directory_label("Project Directory: Not Set")
 
@@ -31,9 +32,14 @@ class MainController:
             if directory:
                 self.project_directory = directory
                 self.view.update_project_directory_label(self.project_directory)
-                self.file_browser.load_directory(directory)
-                self.load_content()  # Load content after the directory is selected
-                self.save_content()  # Save the newly selected project directory
+
+                # Initialize FileBrowserController with selected directory and file_browser view
+                self.file_browser_controller = FileBrowserController(self.view.file_browser, self.project_directory)
+
+                # Delegate the directory loading to FileBrowserController
+                self.file_browser_controller.load_directory(directory)
+                self.load_content()
+                self.save_content()
             else:
                 self.view.update_status("No directory selected.", error=True)
         except Exception as e:
@@ -54,18 +60,8 @@ class MainController:
             self.editors[0].appendPlainText(path)
 
     def get_selected_files(self):
-        checked_files = self.file_browser.get_checked_items()
-        editor = self.editors[0]
-        editor.clear()
-        editor.repaint()
-
-        if checked_files:
-            for file_path in checked_files:
-                relative_path = os.path.relpath(file_path, self.project_directory)
-                editor.appendPlainText(relative_path)
-            editor.repaint()
-        else:
-            self.view.update_status("No files selected", error=True)
+        if self.file_browser_controller:
+            self.file_browser_controller.handle_file_selection()
 
     def read_content(self, editor, window_name):
         content = ""
@@ -147,4 +143,10 @@ class MainController:
                 self.load_content()
 
     def close_event(self):
+        # Save the content of the editors
         self.save_content()
+
+        # Save selected files from the file browser before closing
+        if self.file_browser_controller:
+            self.file_browser_controller.handle_file_selection()
+
