@@ -1,16 +1,12 @@
-# controllers/main_controller.py
-
 from PyQt5.QtWidgets import QFileDialog
-from utils.git_utils import get_git_changes
+from services.file_service import FileService
+from services.git_service import GitService
+from services.json_service import JsonService
 from views.file_browser import FileBrowser
 import os
 import json
 import config
 import pyperclip
-from utils.file_utils import read_file_content
-from utils.json_utils import load_json_file
-from views.text_editor import TextEditor
-
 
 class MainController:
     def __init__(self, view):
@@ -18,6 +14,12 @@ class MainController:
         self.project_directory = ""
         self.editors = view.editors
         self.file_browser = FileBrowser(self)  # Correctly passing self to the FileBrowser
+
+        # Use services for handling specific tasks
+        self.file_service = FileService()
+        self.git_service = GitService()
+        self.json_service = JsonService()
+
         self.save_file = config.SAVE_FILE
 
     def browse_project_directory(self):
@@ -25,14 +27,12 @@ class MainController:
             directory = QFileDialog.getExistingDirectory(self.view, "Select Project Directory")
             if directory:
                 self.project_directory = directory
-                print(f"Selected directory: {self.project_directory}")  # Debugging: Confirm the directory
                 self.view.update_project_directory_label(self.project_directory)
-                self.file_browser.load_directory(directory)  # Load project directory into file browser
+                self.file_browser.load_directory(directory)
                 self.save_content()
             else:
-                print("No directory selected.")  # Debugging: Handle case when no directory is selected
+                self.view.update_status("No directory selected.", error=True)
         except Exception as e:
-            print(f"Error when selecting folder: {e}")  # Debugging: Catch any crashes here
             self.view.update_status(f"Error when selecting folder: {e}", error=True)
 
     def get_git_changes(self):
@@ -40,7 +40,7 @@ class MainController:
             self.view.update_status("Please set a valid project directory first.", error=True)
             return
 
-        file_paths = get_git_changes(self.project_directory)
+        file_paths = self.git_service.get_git_changes(self.project_directory)
         if isinstance(file_paths, str):
             self.view.update_status(file_paths, error=True)
             return
@@ -50,35 +50,24 @@ class MainController:
             self.editors[0].appendPlainText(path)
 
     def get_selected_files(self):
-        """Get selected files from the file browser and show them in Window 1."""
         checked_files = self.file_browser.get_checked_items()
-        print(f"Checked files: {checked_files}")
-
-        editor = self.editors[0]  # Reference Window 1 (Editor 1)
-        print(f"Editor 1 object: {editor}")
-
-        editor.clear()  # Clear Window 1
-        editor.appendPlainText("Test Text")  # Ensure something simple is appended to test visibility
-        editor.repaint()  # Force a UI refresh here
+        editor = self.editors[0]
+        editor.clear()
+        editor.repaint()
 
         if checked_files:
             for file_path in checked_files:
                 relative_path = os.path.relpath(file_path, self.project_directory)
-                print(f"Adding file to editor: {relative_path}")
-                editor.appendPlainText(relative_path)  # Add relative path of the selected file to Window 1
-
-            # After appending all file paths, ensure the editor is repainted
+                editor.appendPlainText(relative_path)
             editor.repaint()
         else:
             self.view.update_status("No files selected", error=True)
-            print("No files selected.")
 
     def read_content(self, editor, window_name):
         content = ""
         lines = editor.toPlainText().splitlines()
         for line in lines:
-            line = line.strip()
-            content += self.process_line(line) + "\n"
+            content += self.process_line(line.strip()) + "\n"
 
         pyperclip.copy(content)
         self.view.update_status(f"Copied from {window_name}")
@@ -94,7 +83,7 @@ class MainController:
             return self.read_file_content(line)
 
     def handle_v_syntax(self, json_path):
-        json_data = load_json_file(config.SELECTIONS_JSON_PATH)
+        json_data = self.json_service.load_json_file(config.SELECTIONS_JSON_PATH)
         if isinstance(json_data, str):
             return json_data
 
@@ -118,7 +107,7 @@ class MainController:
 
     def read_file_content(self, file_path):
         full_path = os.path.join(self.project_directory, file_path)
-        content = read_file_content(full_path)
+        content = self.file_service.read_file_content(full_path)
         if content is not None:
             return f"Content of {os.path.basename(full_path)}:\n{content}\n"
         else:
@@ -132,13 +121,11 @@ class MainController:
             },
             "last_project_directory": self.project_directory
         }
-        with open(self.save_file, "w") as f:
-            json.dump(data, f)
+        self.file_service.save_to_file(self.save_file, json.dumps(data))
 
     def load_content(self):
         if os.path.exists(self.save_file):
-            with open(self.save_file, "r") as f:
-                data = json.load(f)
+            data = json.loads(self.file_service.read_file_content(self.save_file))
             if self.project_directory in data:
                 content = data[self.project_directory]
                 for i, editor in enumerate(self.editors):
@@ -146,8 +133,7 @@ class MainController:
 
     def load_last_workspace(self):
         if os.path.exists(self.save_file):
-            with open(self.save_file, "r") as f:
-                data = json.load(f)
+            data = json.loads(self.file_service.read_file_content(self.save_file))
             self.project_directory = data.get("last_project_directory", "")
             if self.project_directory:
                 self.view.update_project_directory_label(self.project_directory)
