@@ -1,1 +1,1 @@
-["main.py"]
+["config.py", "controllers\\file_browser_controller.py", "controllers\\main_controller.py", "main.py", "services\\file_service.py", "services\\git_service.py", "services\\json_service.py", "views\\file_browser.py", "views\\main_window.py", "views\\text_editor.py"]
